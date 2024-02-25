@@ -1,0 +1,126 @@
+import React from "react";
+
+const ReactConsoleContext = React.createContext<ReactConsoleContext | null>(null);
+
+const optionsSymbol = Symbol("__$ReactConsoleOptions$__");
+
+export function logOptions(opts: LogOptions) {
+    return { ...opts, [optionsSymbol]: true };
+}
+
+export interface LogOptions {
+    style?: React.CSSProperties;
+    className?: string;
+    type?: "warn" | "error" | "info";
+    label?: string;
+}
+
+export type Logger = (options: LogOptions, ...args: any[]) => void;
+
+interface ReactConsoleContext {
+    log(...args: any[]): void;
+    addListener(listener: Logger): void;
+    removeListener(listener: Logger): void;
+    exec(command: string, ...args: string[]): void;
+    options: ReactConsoleOptions;
+}
+
+type ServerOptions = {
+    url: string;
+    /** The method defaults to "POST" */
+    requestInit?: Omit<RequestInit, "body">;
+};
+
+export type ReactConsoleOptions = {
+    /**
+     * Log to default console (`console.log|error|warn|info`)
+     * @default false
+     * */
+    defaultLogs?: boolean;
+    serverOptions?: ServerOptions;
+    keyCombination?: string;
+    server?: ServerOptions;
+    stringifyArgs?: (arg: any) => string;
+    commands?: Record<string, (...args: any[]) => void>;
+    onLog?: (options: LogOptions, ...args: any[]) => void;
+    colors?: { warn?: string; error?: string; info?: string };
+};
+
+interface ReactConsoleProviderProps {
+    options: ReactConsoleOptions;
+    children: React.ReactNode;
+}
+
+export function useReactConsoleContext() {
+    const ctx = React.useContext(ReactConsoleContext);
+    if (!ctx) throw new Error("No ReactConsoleContext found!");
+    return ctx;
+}
+
+export default function ReactConsoleProvider({ options, ...props }: ReactConsoleProviderProps) {
+    const logListeners = React.useMemo<Set<(...args: any[]) => void>>(() => new Set(), []);
+    const log = React.useCallback(
+        (...args: any[]) => {
+            // get log options
+            const foundLogOptions: LogOptions[] = [];
+            const _args: any[] = [];
+
+            args.forEach(arg => {
+                if (arg[optionsSymbol]) foundLogOptions.push(arg);
+                else _args.push(arg);
+            });
+
+            const _logOptions = foundLogOptions.reduce((allOptions, opts) => ({ ...allOptions, ...opts }), {});
+
+            options.onLog?.(_logOptions, ..._args);
+
+            // real console log
+            if (options.defaultLogs) {
+                switch (_logOptions.type) {
+                    case "error":
+                        console.log(_args);
+                        break;
+                    case "warn":
+                        console.warn(_args);
+                        break;
+                    case "info":
+                        console.info(_args);
+                        break;
+                    default:
+                        console.log(_args);
+                        break;
+                }
+            }
+
+            // server log
+            if (options.server) {
+                fetch(options.server.url, { ...options.server.requestInit, method: options.server.requestInit?.method ?? "POST", body: JSON.stringify(_args) })
+                    .then()
+                    .catch(err => {
+                        log(logOptions({ type: "error" }), "Server log failed: ", err instanceof Error ? err.message : err.toString());
+                    });
+            }
+
+            // raect console log
+            logListeners.forEach(listener => listener(_logOptions, ..._args));
+        },
+        [logListeners, options.defaultLogs]
+    );
+    const exec = React.useCallback(
+        async (command: string, ...args: string[]) => {
+            const comm = options.commands?.[command];
+            if (comm) {
+                try {
+                    await comm(...args);
+                } catch (err) {
+                    log(logOptions({ type: "error", style: { fontStyle: "italic" } }), `Command '${command}' failed: ${err instanceof Error ? err.message : err + ""}`);
+                }
+            } else log(logOptions({ type: "warn", style: { fontStyle: "italic" } }), `Command '${command}' not found`);
+        },
+        [options.commands]
+    );
+    const addListener = React.useCallback((listener: (...args: any[]) => void) => logListeners.add(listener), [logListeners]);
+    const removeListener = React.useCallback((listener: (...args: any[]) => void) => logListeners.delete(listener), [logListeners]);
+
+    return <ReactConsoleContext.Provider value={{ log, exec, addListener, removeListener, options }}>{props.children}</ReactConsoleContext.Provider>;
+}
