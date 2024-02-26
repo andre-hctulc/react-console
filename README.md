@@ -1,6 +1,6 @@
 # react-console
 
-A simple React console for logging or executing commands
+A simple React console for logging and executing commands
 
 ## Usage
 
@@ -30,7 +30,12 @@ const options: ReactConsoleOptions = {
 const { exec, log } = useReactConsole();
 // Commands can also be executed in the console via user input
 exec("alert", "Hello world!");
+// default commands. Can be disabled in the options
+exec("echo", "Echo!!")
+
+// logs
 log("Hello world!");
+log(<span>Hello</span>, "world!);
 log(logOptions({ type: "error" }), "An error occured:", new Error("error message"));
 log("Connected", logOption({ type: "info" }), connection);
 ```

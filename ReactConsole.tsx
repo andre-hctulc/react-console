@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import { LogOptions, Logger, ReactConsoleOptions, useReactConsoleContext } from "./ReactConsoleContext";
 
@@ -46,7 +48,7 @@ function parseArgs(argsStr: string) {
 
 const height = 300;
 const width = 300;
-const border = "1px solid gray";
+const border = "1px solid lightgray";
 
 function getTypeColor(type: string | undefined, options?: ReactConsoleOptions): string | undefined {
     switch (type) {
@@ -69,14 +71,13 @@ const getPositionStyle = (position: ReactConsoleProps["defaultPosition"]) => {
                 width: "100%",
                 borderBottom: border,
                 height,
-                maxHeight: height,
             };
         case "left":
             return {
                 left: 0,
                 height: "100%",
                 borderRight: border,
-                maxWidth: width,
+                width,
             };
         case "right":
             return {
@@ -84,15 +85,14 @@ const getPositionStyle = (position: ReactConsoleProps["defaultPosition"]) => {
                 height: "100%",
                 borderLeft: border,
                 width,
-                maxWidth: width,
             };
         case "bottom":
+        default:
             return {
                 bottom: 0,
                 width: "100%",
                 borderTop: border,
                 height,
-                //maxHeight: height,
             };
     }
 };
@@ -102,7 +102,7 @@ const flexCol: React.CSSProperties = { display: "flex", flexDirection: "column" 
 const text: React.CSSProperties = { fontSize: "17px" };
 const bg = { background: "#f6f6f6" };
 const truncate: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
-const longText: React.CSSProperties = { whiteSpace: "normal", overflow: "visible", textOverflow: "clip" };
+const longText: React.CSSProperties = { whiteSpace: "normal", overflow: "visible", textOverflow: "clip", wordBreak: "break-all" };
 
 // Component
 
@@ -110,7 +110,7 @@ const maxLabelWidth = 180;
 
 interface ReactConsoleProps {
     title?: string;
-    /** controlled */
+    /** controlled - Disables key combination open! */
     open?: boolean;
     onClose?: () => void;
     style?: React.CSSProperties;
@@ -123,13 +123,31 @@ interface ReactConsoleProps {
     maxEntries?: number;
 }
 
+function Arrow(props: { rotate: number; onClick?: React.MouseEventHandler }) {
+    return (
+        <svg
+            onClick={props.onClick}
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            style={{ rotate: props.rotate + "deg", cursor: "pointer" }}
+            strokeWidth={1.5}
+            stroke="currentColor"
+            height={18}
+            width={18}
+        >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3" />
+        </svg>
+    );
+}
+
 export default function ReactCosole(props: ReactConsoleProps) {
+    const isControlled = props.open !== undefined;
     const [open, setOpen] = React.useState(() => props.open ?? localStorage.getItem(storagePre + "open") === "true");
     const root = React.useRef<HTMLDivElement>(null);
-    const [position, setPosition] = React.useState(props.defaultPosition || "bottom");
+    const [position, setPosition] = React.useState(() => localStorage.getItem(storagePre + "position") ?? props.defaultPosition ?? "bottom");
     const cons = useReactConsoleContext();
     const [logs, setLogs] = React.useState<{ options: LogOptions; nodes: React.ReactNode[]; id: string }[]>([]);
-    const leftRight = position === "left" || position === "right";
     const [inpValue, setInpVal] = React.useState("");
     const inp = React.useRef<HTMLInputElement>(null);
 
@@ -138,6 +156,8 @@ export default function ReactCosole(props: ReactConsoleProps) {
     }, [props.open]);
 
     React.useEffect(() => {
+        if (isControlled) return;
+
         const listener = (e: KeyboardEvent) => {
             if (e.ctrlKey && e.shiftKey && (e.key === "c" || e.key === "C")) {
                 _open(!open);
@@ -178,20 +198,22 @@ export default function ReactCosole(props: ReactConsoleProps) {
 
     const label = props.label ?? "Console";
 
-    function handleClick(e: React.MouseEvent) {
-        inp.current?.focus();
-    }
-
     function _open(open: boolean) {
         setOpen(open);
         localStorage.setItem(storagePre + "open", open + "");
+    }
+
+    function _setPosition(pos: ReactConsoleProps["defaultPosition"]) {
+        pos = pos || "bottom";
+        localStorage.setItem(storagePre + "position", pos);
+        setPosition(pos);
     }
 
     if (!open) return null;
 
     return (
         <div
-            onClick={handleClick}
+            onClick={() => inp.current?.focus()}
             style={{
                 ...flexCol,
                 ...bg,
@@ -200,35 +222,47 @@ export default function ReactCosole(props: ReactConsoleProps) {
                 minWidth: 0,
                 position: "fixed",
                 cursor: "text",
-                boxShadow: "10px",
-                ...getPositionStyle(position),
+                boxShadow: "rgba(0, 0, 0, 0.16) 0px 1px 4px",
+                zIndex: 100,
+                overflow: "hidden",
+                ...getPositionStyle(position as any),
                 ...props.style,
             }}
             className={props.className}
             ref={root}
         >
-            <div style={{ flexShrink: 0, position: "sticky", top: 0, ...flexRow }}>
-                <span style={{ ...bg, borderBottomRightRadius: 5, padding: 3, color: "lightgrey", fontSize: 14 }}>
+            <header onClick={e => e.stopPropagation()} style={{ flexShrink: 0, position: "sticky", gap: 5, top: 0, ...flexRow }}>
+                <span style={{ ...bg, ...truncate, borderBottomRightRadius: 5, padding: 3, color: "lightgrey", fontSize: 14 }}>
                     {props.title ?? "ReactConsole"} <i style={{ paddingLeft: 5 }}>{logs.length} Logs</i>
                 </span>
-                <svg
-                    style={{ rotate: "45deg", marginLeft: "auto", marginTop: 4, marginRight: 4, cursor: "pointer" }}
-                    onClick={() => setOpen(false)}
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 100 100"
-                >
-                    <line x1="0" y1="50" x2="100" y2="50" stroke="black" stroke-width="7" />
-                    <line x1="50" y1="0" x2="50" y2="100" stroke="black" stroke-width="7" />
-                </svg>
-            </div>
-            <ol style={{ ...flexCol, flexShrink: 0, padding: 0, margin: 0, listStyleType: "none" }}>
+                <nav style={{ ...flexRow, gap: 5, marginLeft: "auto", padding: 5 }}>
+                    <Arrow rotate={90} onClick={() => _setPosition("left")}></Arrow>
+                    <Arrow rotate={180} onClick={() => _setPosition("top")}></Arrow>
+                    <Arrow rotate={270} onClick={() => _setPosition("right")}></Arrow>
+                    <Arrow rotate={0} onClick={() => _setPosition("bottom")}></Arrow>
+                    {/* Close */}
+                    <svg
+                        style={{ rotate: "45deg", cursor: "pointer" }}
+                        onClick={() => {
+                            if (!isControlled) setOpen(false);
+                            props.onClose?.();
+                        }}
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 100 100"
+                    >
+                        <line x1="0" y1="50" x2="100" y2="50" stroke="black" stroke-width="7" />
+                        <line x1="50" y1="0" x2="50" y2="100" stroke="black" stroke-width="7" />
+                    </svg>
+                </nav>
+            </header>
+            <ol style={{ ...flexCol, maxWidth: "100%", flexShrink: 0, padding: 0, margin: 0, listStyleType: "none" }}>
                 {logs.map(log => {
                     return (
-                        <li style={{ ...flexRow, flexShrink: 0, flexDirection: leftRight ? "column" : "row" }} key={log.id}>
+                        <li style={{ ...flexRow, flexShrink: 0, flexDirection: "row" }} key={log.id}>
                             <span style={{ ...text, ...truncate, maxWidth: maxLabelWidth, flexShrink: 0, paddingLeft: 2, color: "gray", paddingRight: 10 }}>{label}</span>
-                            <div style={{ ...text, color: getTypeColor(log.options.type), ...log.options.style }} className={props.className}>
+                            <div style={{ ...text, ...longText, color: getTypeColor(log.options.type), ...log.options.style }} className={props.className}>
                                 {log.nodes}
                             </div>
                         </li>
@@ -237,12 +271,14 @@ export default function ReactCosole(props: ReactConsoleProps) {
             </ol>
             {!props.disableInput && (
                 <div style={{ ...flexRow, ...bg, flexShrink: 0, background: "inherit", position: "sticky", bottom: 0 }}>
-                    <label style={{ ...text, flexShrink: 0, maxWidth: maxLabelWidth, ...truncate, paddingLeft: 2, color: "gray", paddingRight: 10 }}>{label}</label>
+                    <label style={{ ...text, margin: 0, flexShrink: 0, maxWidth: maxLabelWidth, ...truncate, paddingLeft: 2, color: "gray", paddingRight: 10 }}>
+                        {label}
+                    </label>
                     <input
                         value={inpValue}
                         ref={inp}
                         onChange={e => setInpVal(e.target.value)}
-                        style={{ ...text, ...bg, fontFamily: "inherit", flexGrow: 1, outline: "none", border: "0px" }}
+                        style={{ ...text, ...bg, padding: 0, margin: 0, fontFamily: "inherit", flexGrow: 1, outline: "none", border: "0px" }}
                         onKeyDown={e => {
                             const value = e.currentTarget.value;
 
