@@ -1,5 +1,4 @@
-test
-todo.md
-TODO.md
+test/node_modules
+test/package-lock.json
 Todo.md
 node_modules

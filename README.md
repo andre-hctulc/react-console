@@ -26,16 +26,21 @@ const options: ReactConsoleOptions = {
 </ReactConsoleProvider>
 ```
 
+Now press `Ctrl + Shift + C` to toggle the open state of the consle or use `ReactConsole.open` prop to control
+the open state yourself. Use the input to execute commands. Default commands like _echo_ are available by default.
+
+### useReactConsole
+
 ```tsx
 const { exec, log } = useReactConsole();
-// Commands can also be executed in the console via user input
-exec("alert", "Hello world!");
-// default commands. Can be disabled in the options
-exec("echo", "Echo!!")
 
 // logs
 log("Hello world!");
 log(<span>Hello</span>, "world!);
 log(logOptions({ type: "error" }), "An error occured:", new Error("error message"));
-log("Connected", logOption({ type: "info" }), connection);
+log("Connected", logOption({ type: "info", style: { color: "violet", fontStyle: "italic" } }), connection);
+
+// Execute commands programatically
+exec("alert", "Hello world!");
+exec("echo", "Echo", "Echoo")
 ```

@@ -68,6 +68,7 @@ const getPositionStyle = (position: ReactConsoleProps["defaultPosition"]) => {
         case "top":
             return {
                 top: 0,
+                left: 0,
                 width: "100%",
                 borderBottom: border,
                 height,
@@ -75,6 +76,7 @@ const getPositionStyle = (position: ReactConsoleProps["defaultPosition"]) => {
         case "left":
             return {
                 left: 0,
+                top: 0,
                 height: "100%",
                 borderRight: border,
                 width,
@@ -82,6 +84,7 @@ const getPositionStyle = (position: ReactConsoleProps["defaultPosition"]) => {
         case "right":
             return {
                 right: 0,
+                top: 0,
                 height: "100%",
                 borderLeft: border,
                 width,
@@ -90,6 +93,7 @@ const getPositionStyle = (position: ReactConsoleProps["defaultPosition"]) => {
         default:
             return {
                 bottom: 0,
+                left: 0,
                 width: "100%",
                 borderTop: border,
                 height,
@@ -141,11 +145,17 @@ function Arrow(props: { rotate: number; onClick?: React.MouseEventHandler }) {
     );
 }
 
-export default function ReactCosole(props: ReactConsoleProps) {
+const ReactCosole = React.forwardRef<HTMLDivElement, ReactConsoleProps>((props, ref) => {
     const isControlled = props.open !== undefined;
-    const [open, setOpen] = React.useState(() => props.open ?? localStorage.getItem(storagePre + "open") === "true");
-    const root = React.useRef<HTMLDivElement>(null);
-    const [position, setPosition] = React.useState(() => localStorage.getItem(storagePre + "position") ?? props.defaultPosition ?? "bottom");
+    const [open, setOpen] = React.useState(() => {
+        if (typeof window === "undefined") return props.open ?? false;
+        else return props.open ?? localStorage.getItem(storagePre + "open") === "true";
+    });
+    const root = React.useRef<HTMLDivElement | null>(null);
+    const [position, setPosition] = React.useState(() => {
+        if (typeof window === "undefined") return props.defaultPosition ?? "bottom";
+        else return localStorage.getItem(storagePre + "position") ?? props.defaultPosition ?? "bottom";
+    });
     const cons = useReactConsoleContext();
     const [logs, setLogs] = React.useState<{ options: LogOptions; nodes: React.ReactNode[]; id: string }[]>([]);
     const [inpValue, setInpVal] = React.useState("");
@@ -209,8 +219,6 @@ export default function ReactCosole(props: ReactConsoleProps) {
         setPosition(pos);
     }
 
-    if (!open) return null;
-
     return (
         <div
             onClick={() => inp.current?.focus()}
@@ -219,6 +227,8 @@ export default function ReactCosole(props: ReactConsoleProps) {
                 ...bg,
                 overflowY: "auto",
                 minHeight: 0,
+                // hide instead of not rendering, because initlial client/server renders must be in sync (nextjs)
+                display: open ? "flex" : "none",
                 minWidth: 0,
                 position: "fixed",
                 cursor: "text",
@@ -229,17 +239,25 @@ export default function ReactCosole(props: ReactConsoleProps) {
                 ...props.style,
             }}
             className={props.className}
-            ref={root}
+            ref={div => {
+                root.current = div;
+                if (ref) {
+                    if (typeof ref === "function") ref(div);
+                    else ref.current = div;
+                }
+            }}
         >
+            {/* Header */}
             <header onClick={e => e.stopPropagation()} style={{ flexShrink: 0, position: "sticky", gap: 5, top: 0, ...flexRow }}>
                 <span style={{ ...bg, ...truncate, borderBottomRightRadius: 5, padding: 3, color: "lightgrey", fontSize: 14 }}>
                     {props.title ?? "ReactConsole"} <i style={{ paddingLeft: 5 }}>{logs.length} Logs</i>
                 </span>
                 <nav style={{ ...flexRow, gap: 5, marginLeft: "auto", padding: 5 }}>
-                    <Arrow rotate={90} onClick={() => _setPosition("left")}></Arrow>
-                    <Arrow rotate={180} onClick={() => _setPosition("top")}></Arrow>
-                    <Arrow rotate={270} onClick={() => _setPosition("right")}></Arrow>
-                    <Arrow rotate={0} onClick={() => _setPosition("bottom")}></Arrow>
+                    {/* Position */}
+                    <Arrow rotate={90} onClick={() => _setPosition("left")} />
+                    <Arrow rotate={180} onClick={() => _setPosition("top")} />
+                    <Arrow rotate={270} onClick={() => _setPosition("right")} />
+                    <Arrow rotate={0} onClick={() => _setPosition("bottom")} />
                     {/* Close */}
                     <svg
                         style={{ rotate: "45deg", cursor: "pointer" }}
@@ -252,11 +270,12 @@ export default function ReactCosole(props: ReactConsoleProps) {
                         height="18"
                         viewBox="0 0 100 100"
                     >
-                        <line x1="0" y1="50" x2="100" y2="50" stroke="black" stroke-width="7" />
-                        <line x1="50" y1="0" x2="50" y2="100" stroke="black" stroke-width="7" />
+                        <line x1="0" y1="50" x2="100" y2="50" stroke="black" strokeWidth="7" />
+                        <line x1="50" y1="0" x2="50" y2="100" stroke="black" strokeWidth="7" />
                     </svg>
                 </nav>
             </header>
+            {/* Logs List */}
             <ol style={{ ...flexCol, maxWidth: "100%", flexShrink: 0, padding: 0, margin: 0, listStyleType: "none" }}>
                 {logs.map(log => {
                     return (
@@ -269,6 +288,7 @@ export default function ReactCosole(props: ReactConsoleProps) {
                     );
                 })}
             </ol>
+            {/* Input */}
             {!props.disableInput && (
                 <div style={{ ...flexRow, ...bg, flexShrink: 0, background: "inherit", position: "sticky", bottom: 0 }}>
                     <label style={{ ...text, margin: 0, flexShrink: 0, maxWidth: maxLabelWidth, ...truncate, paddingLeft: 2, color: "gray", paddingRight: 10 }}>
@@ -296,4 +316,8 @@ export default function ReactCosole(props: ReactConsoleProps) {
             )}
         </div>
     );
-}
+});
+
+ReactCosole.displayName = "ReactCosole";
+
+export default ReactCosole;
