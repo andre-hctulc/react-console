@@ -147,19 +147,20 @@ function Arrow(props: { rotate: number; onClick?: React.MouseEventHandler }) {
 
 const ReactCosole = React.forwardRef<HTMLDivElement, ReactConsoleProps>((props, ref) => {
     const isControlled = props.open !== undefined;
-    const [open, setOpen] = React.useState(() => {
-        if (typeof window === "undefined") return props.open ?? false;
-        else return props.open ?? localStorage.getItem(storagePre + "open") === "true";
-    });
+    const [open, setOpen] = React.useState(false);
     const root = React.useRef<HTMLDivElement | null>(null);
-    const [position, setPosition] = React.useState(() => {
-        if (typeof window === "undefined") return props.defaultPosition ?? "bottom";
-        else return localStorage.getItem(storagePre + "position") ?? props.defaultPosition ?? "bottom";
-    });
+    const [position, setPosition] = React.useState<string>("bottom");
     const cons = useReactConsoleContext();
     const [logs, setLogs] = React.useState<{ options: LogOptions; nodes: React.ReactNode[]; id: string }[]>([]);
     const [inpValue, setInpVal] = React.useState("");
     const inp = React.useRef<HTMLInputElement>(null);
+
+    // defaults (local storage must be used in effect, because of SSR)
+    React.useEffect(() => {
+        setOpen(props.open ?? localStorage.getItem(storagePre + "open") === "true");
+        setPosition(localStorage.getItem(storagePre + "position") ?? props.defaultPosition ?? "bottom");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     React.useEffect(() => {
         if (props.open !== undefined) _open(props.open);
@@ -211,6 +212,7 @@ const ReactCosole = React.forwardRef<HTMLDivElement, ReactConsoleProps>((props, 
     function _open(open: boolean) {
         setOpen(open);
         localStorage.setItem(storagePre + "open", open + "");
+        if (!open) props.onClose?.();
     }
 
     function _setPosition(pos: ReactConsoleProps["defaultPosition"]) {
@@ -218,6 +220,8 @@ const ReactCosole = React.forwardRef<HTMLDivElement, ReactConsoleProps>((props, 
         localStorage.setItem(storagePre + "position", pos);
         setPosition(pos);
     }
+
+    if (!open) return null;
 
     return (
         <div
@@ -227,8 +231,7 @@ const ReactCosole = React.forwardRef<HTMLDivElement, ReactConsoleProps>((props, 
                 ...bg,
                 overflowY: "auto",
                 minHeight: 0,
-                // hide instead of not rendering, because initlial client/server renders must be in sync (nextjs)
-                display: open ? "flex" : "none",
+                display: "flex",
                 minWidth: 0,
                 position: "fixed",
                 cursor: "text",
@@ -262,8 +265,7 @@ const ReactCosole = React.forwardRef<HTMLDivElement, ReactConsoleProps>((props, 
                     <svg
                         style={{ rotate: "45deg", cursor: "pointer" }}
                         onClick={() => {
-                            if (!isControlled) setOpen(false);
-                            props.onClose?.();
+                            if (!isControlled) _open(false);
                         }}
                         xmlns="http://www.w3.org/2000/svg"
                         width="18"
@@ -280,8 +282,23 @@ const ReactCosole = React.forwardRef<HTMLDivElement, ReactConsoleProps>((props, 
                 {logs.map(log => {
                     return (
                         <li style={{ ...flexRow, flexShrink: 0, flexDirection: "row" }} key={log.id}>
-                            <span style={{ ...text, ...truncate, maxWidth: maxLabelWidth, flexShrink: 0, paddingLeft: 2, color: "gray", paddingRight: 10 }}>{label}</span>
-                            <div style={{ ...text, ...longText, color: getTypeColor(log.options.type), ...log.options.style }} className={props.className}>
+                            <span
+                                style={{
+                                    ...text,
+                                    ...truncate,
+                                    maxWidth: maxLabelWidth,
+                                    flexShrink: 0,
+                                    paddingLeft: 2,
+                                    color: "gray",
+                                    paddingRight: 10,
+                                }}
+                            >
+                                {label}
+                            </span>
+                            <div
+                                style={{ ...text, ...longText, color: getTypeColor(log.options.type), ...log.options.style }}
+                                className={props.className}
+                            >
                                 {log.nodes}
                             </div>
                         </li>
@@ -291,7 +308,18 @@ const ReactCosole = React.forwardRef<HTMLDivElement, ReactConsoleProps>((props, 
             {/* Input */}
             {!props.disableInput && (
                 <div style={{ ...flexRow, ...bg, flexShrink: 0, background: "inherit", position: "sticky", bottom: 0 }}>
-                    <label style={{ ...text, margin: 0, flexShrink: 0, maxWidth: maxLabelWidth, ...truncate, paddingLeft: 2, color: "gray", paddingRight: 10 }}>
+                    <label
+                        style={{
+                            ...text,
+                            margin: 0,
+                            flexShrink: 0,
+                            maxWidth: maxLabelWidth,
+                            ...truncate,
+                            paddingLeft: 2,
+                            color: "gray",
+                            paddingRight: 10,
+                        }}
+                    >
                         {label}
                     </label>
                     <input
