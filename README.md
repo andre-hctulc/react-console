@@ -5,6 +5,10 @@ A simple React console for logging and executing commands
 ## Usage
 
 ```tsx
+import { ReactConsole, ReactConsoleProvider } from "@react-console";
+
+...
+
 const options: ReactConsoleOptions = {
     // define commands
     commands: {
@@ -26,12 +30,16 @@ const options: ReactConsoleOptions = {
 </ReactConsoleProvider>
 ```
 
-Now press `Ctrl + Shift + C` to toggle the open state of the consle or use `ReactConsole.open` prop to control
-the open state yourself. Use the input to execute commands. Default commands like _echo_ are available by default.
+Now press `Ctrl + Shift + C` to toggle the open state of the console or use `ReactConsole.open` prop to control
+the open state yourself. Use the input to execute commands. Default commands (_echo_) are available by default and can be overridden.
 
 ### useReactConsole
 
 ```tsx
+import { logOptions } from "@react-console";
+
+...
+
 const { exec, log } = useReactConsole();
 
 // logs
